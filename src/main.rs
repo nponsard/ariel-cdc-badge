@@ -165,7 +165,7 @@ async fn screen(peripherals: pins::Epd) {
         draw_target.clear(BinaryColor::On);
         // Draw the image with the top left corner at (10, 20) by wrapping it in
         // an embedded-graphics `Image`.
-        Image::new(&bmp, Point::new(0, 0))
+        Image::new(&bmp, Point::new(92, 0))
             .draw(&mut draw_target)
             .unwrap();
 
@@ -249,12 +249,15 @@ mod drawer {
             I: IntoIterator<Item = Pixel<Self::Color>>,
         {
             for Pixel(coord, color) in pixels {
-                let index = (coord.y as usize) * 128 / 8 + (coord.x as usize) / 8;
+                let x = 127 - coord.y;
+                let y = coord.x;
+
+                let index = (y as usize) * 128 / 8 + (x as usize) / 8;
 
                 if color == BinaryColor::On {
-                    self.frame_buffer[index] |= 0x80 >> (coord.x % 8);
+                    self.frame_buffer[index] |= 0x80 >> (x % 8);
                 } else {
-                    self.frame_buffer[index] &= !(0x80 >> (coord.x % 8));
+                    self.frame_buffer[index] &= !(0x80 >> (x % 8));
                 }
             }
             Ok(())
@@ -264,7 +267,7 @@ mod drawer {
         fn bounding_box(&self) -> embedded_graphics::primitives::Rectangle {
             embedded_graphics::primitives::Rectangle::new(
                 embedded_graphics::prelude::Point::new(0, 0),
-                embedded_graphics::prelude::Size::new(128, 296),
+                embedded_graphics::prelude::Size::new(296, 128),
             )
         }
     }
