@@ -6,8 +6,14 @@ use ariel_os::spi::main::SpiDevice;
 use ariel_os::time::{Delay, Timer};
 use ariel_os::{gpio, hal, i2c, spi};
 use embassy_sync::mutex::Mutex;
+use embedded_graphics::image::Image;
+use embedded_graphics::pixelcolor::BinaryColor;
+use embedded_graphics::prelude::{DrawTarget, Point, Primitive, Size};
+use embedded_graphics::primitives::Rectangle;
+use embedded_graphics::{Drawable, draw_target};
 use embedded_hal_async::i2c::I2c as _;
 use ssd1680_rs::config::{LUTSelect, UpdateRamOption, VDBMode};
+use tinybmp::Bmp;
 
 const BQ25895_ADDR: u16 = 0x6A;
 const EXPANDER_ADDR: u16 = 0x20;
@@ -77,12 +83,19 @@ async fn screen(peripherals: pins::Epd) {
         Mutex<embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, hal::spi::main::Spi>,
     > = once_cell::sync::OnceCell::new();
 
+    info!("Starting EPD demo");
     let mut spi_config = hal::spi::main::Config::default();
     spi_config.frequency = const {
-        spi::main::highest_freq_in(
-            spi::main::Kilohertz::kHz(1000)..=spi::main::Kilohertz::kHz(2000),
-        )
+        spi::main::highest_freq_in(spi::main::Kilohertz::MHz(1)..=spi::main::Kilohertz::MHz(20))
     };
+    // spi_config.mode = spi::Mode::Mode0;
+
+    info!("Configured SPI");
+    // spi_config.frequency = const {
+    //     spi::main::highest_freq_in(
+    //         spi::main::Kilohertz::kHz(1000)..=spi::main::Kilohertz::kHz(2000),
+    //     )
+    // };
 
     let spi_bus = pins::EpdSpi::new(
         peripherals.spi_sck,
@@ -90,6 +103,8 @@ async fn screen(peripherals: pins::Epd) {
         peripherals.spi_mosi,
         spi_config,
     );
+
+    info!("Created SPI bus");
 
     let _ = SPI_BUS.set(Mutex::new(spi_bus));
 
@@ -121,25 +136,136 @@ async fn screen(peripherals: pins::Epd) {
     let mut epd_controller =
         ssd1680_rs::driver_async::SSD1680::new(reset, dc, busy, Delay, spi_device, config);
 
-    let mut frame_buffer: [u8; 37888];
+    let mut draw_target = drawer::SsdTarget::new();
+
+    // Include the BMP file data.
+    let bmp_data = include_bytes!("../hexacube.bmp");
+
+    // Parse the BMP file.
+    let bmp: Bmp<'_, BinaryColor> = Bmp::from_slice(bmp_data).unwrap();
+
+    draw_target.clear(BinaryColor::On);
+
+    info!("flushing display");
+    draw_target.flush(&mut epd_controller).await;
+
+    info!("full refresh");
+
+    // epd_controller.full_refresh().await.unwrap();
+    info!("full refresh done");
+
+    Timer::after_millis(500).await;
+
+    let mut x = 0;
+    let mut y = 0;
+
+    info!("entering main loop");
 
     loop {
-        frame_buffer = [0u8; FRAME_BUFFER_SIZE];
+        draw_target.clear(BinaryColor::On);
+        // Draw the image with the top left corner at (10, 20) by wrapping it in
+        // an embedded-graphics `Image`.
+        Image::new(&bmp, Point::new(0, 0))
+            .draw(&mut draw_target)
+            .unwrap();
 
-        epd_controller.hw_init().await.unwrap();
-        // epd_controller.fill_bw_screen(true).await.unwrap();
+        // draw_target.frame_buffer[(y as usize * 128 + x as usize) / 8] = 0x00;
 
-        epd_controller.write_bw_bytes(&frame_buffer).await.unwrap();
-        epd_controller.full_refresh().await.unwrap();
-        epd_controller.enter_deep_sleep().await.unwrap();
-        Timer::after_millis(500).await;
-        frame_buffer = [255u8; FRAME_BUFFER_SIZE];
+        // Rectangle::new(
+        //     Point { x, y },
+        //     Size {
+        //         width: 2,
+        //         height: 2,
+        //     },
+        // )
+        // .into_styled(embedded_graphics::primitives::PrimitiveStyle::with_fill(
+        //     BinaryColor::Off,
+        // ))
+        // .draw(&mut draw_target)
+        // .unwrap();
+        x += 2;
+        if x >= 128 {
+            x = 0;
+            y += 2;
+            if y >= 296 {
+                y = 0;
+            }
+        }
 
-        epd_controller.hw_init().await.unwrap();
+        info!("Updating display at position ({}, {})", x, y);
 
-        epd_controller.write_bw_bytes(&frame_buffer).await.unwrap();
+        draw_target.flush(&mut epd_controller).await;
 
-        epd_controller.full_refresh().await.unwrap();
-        epd_controller.enter_deep_sleep().await.unwrap();
+        Timer::after(ariel_os::time::Duration::from_millis(10000)).await;
+    }
+}
+
+mod drawer {
+    use embedded_graphics::{
+        Pixel,
+        pixelcolor::BinaryColor,
+        prelude::{Dimensions, DrawTarget},
+    };
+    use embedded_hal::digital::{InputPin, OutputPin};
+    use embedded_hal_async::{delay::DelayNs, digital::Wait, spi::SpiDevice};
+    use ssd1680_rs::driver_async::SSD1680;
+
+    pub struct SsdTarget {
+        pub frame_buffer: [u8; super::FRAME_BUFFER_SIZE / 8],
+    }
+    impl SsdTarget {
+        pub fn new() -> Self {
+            Self {
+                frame_buffer: [0u8; super::FRAME_BUFFER_SIZE / 8],
+            }
+        }
+        pub async fn flush<
+            RST: OutputPin,
+            DC: OutputPin,
+            BUSY: InputPin + Wait,
+            DELAY: DelayNs,
+            SPI: SpiDevice,
+        >(
+            &self,
+            driver: &mut SSD1680<RST, DC, BUSY, DELAY, SPI>,
+        ) {
+            driver.hw_init().await.unwrap();
+
+            driver
+                .write_bw_bytes(&self.frame_buffer[0..(128 * 296 / 8) as usize])
+                .await
+                .unwrap();
+            driver.full_refresh().await.unwrap();
+            driver.enter_deep_sleep().await.unwrap();
+        }
+    }
+
+    impl DrawTarget for SsdTarget {
+        type Color = BinaryColor;
+        type Error = core::convert::Infallible;
+
+        fn draw_iter<I>(&mut self, pixels: I) -> Result<(), Self::Error>
+        where
+            I: IntoIterator<Item = Pixel<Self::Color>>,
+        {
+            for Pixel(coord, color) in pixels {
+                let index = (coord.y as usize) * 128 / 8 + (coord.x as usize) / 8;
+
+                if color == BinaryColor::On {
+                    self.frame_buffer[index] |= 0x80 >> (coord.x % 8);
+                } else {
+                    self.frame_buffer[index] &= !(0x80 >> (coord.x % 8));
+                }
+            }
+            Ok(())
+        }
+    }
+    impl Dimensions for SsdTarget {
+        fn bounding_box(&self) -> embedded_graphics::primitives::Rectangle {
+            embedded_graphics::primitives::Rectangle::new(
+                embedded_graphics::prelude::Point::new(0, 0),
+                embedded_graphics::prelude::Size::new(128, 296),
+            )
+        }
     }
 }

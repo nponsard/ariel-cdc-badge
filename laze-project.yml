@@ -9,6 +9,6 @@ apps:
     env:
       global:
         executor_stacksize_required:
-          - "32768"
+          - "131072"
         thread_stacksize_required:
-          - "32768"
+          - "131072"
