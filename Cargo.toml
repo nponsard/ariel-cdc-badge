@@ -1,0 +1,31 @@
+[package]
+name = "ariel-cdc-badge"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+ariel-os = { path = "build/imports/ariel-os/src/ariel-os", features = [
+  "i2c",
+  "spi",
+  "external-interrupts",
+  "time",
+] }
+ariel-os-boards = { path = "build/imports/ariel-os/src/ariel-os-boards" }
+
+ssd1680-rs = { git = "https://github.com/nponsard/ssd1680-rs.git", features = [
+  "async",
+] }
+
+embedded-hal = "1.0.0"
+embedded-hal-async = "1.0.0"
+
+once_cell = { version = "1.21.3", default-features = false, features = [
+  "critical-section",
+] }
+
+embassy-sync = "0.7.2"
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = [
+  'cfg(context, values(any()))',
+] }

@@ -1,0 +1,14 @@
+imports:
+  - git:
+      url: https://github.com/ariel-os/ariel-os
+      branch: main
+    dldir: ariel-os
+
+apps:
+  - name: ariel-cdc-badge
+    env:
+      global:
+        executor_stacksize_required:
+          - "32768"
+        thread_stacksize_required:
+          - "32768"
