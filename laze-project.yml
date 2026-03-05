@@ -6,6 +6,8 @@ imports:
 
 apps:
   - name: ariel-cdc-badge
+    context:
+      - espressif-esp32-s3-devkitc-1
     env:
       global:
         executor_stacksize_required:

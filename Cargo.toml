@@ -1,7 +1,8 @@
 [package]
-name = "ariel-cdc-badge"
+name = "cdc-badge-demo"
 version = "0.1.0"
 edition = "2024"
+license = "MIT OR Apache-2.0"
 
 [dependencies]
 ariel-os = { path = "build/imports/ariel-os/src/ariel-os", features = [
