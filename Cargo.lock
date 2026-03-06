@@ -27,22 +27,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c583acf993cf4245c4acb0a2cc2ab1f9cc097de73411bb6d3647ff6af2b1013d"
 
 [[package]]
-name = "ariel-cdc-badge"
-version = "0.1.0"
-dependencies = [
- "ariel-os",
- "ariel-os-boards",
- "embassy-sync 0.7.2",
- "embedded-graphics",
- "embedded-graphics-core",
- "embedded-hal 1.0.0",
- "embedded-hal-async",
- "once_cell",
- "ssd1680-rs",
- "tinybmp",
-]
-
-[[package]]
 name = "ariel-os"
 version = "0.3.0"
 dependencies = [
@@ -504,6 +488,22 @@ name = "byteorder"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1fd0f2584146f6f2ef48085050886acf353beff7305ebd1ae69500e27c67f64b"
+
+[[package]]
+name = "cdc-badge-demo"
+version = "0.1.0"
+dependencies = [
+ "ariel-os",
+ "ariel-os-boards",
+ "embassy-sync 0.7.2",
+ "embedded-graphics",
+ "embedded-graphics-core",
+ "embedded-hal 1.0.0",
+ "embedded-hal-async",
+ "once_cell",
+ "ssd1680-rs",
+ "tinybmp",
+]
 
 [[package]]
 name = "cfg-if"
